@@ -711,6 +711,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> openNetworkPill());
         btnVpn.setOnClickListener(v -> openVpnPill());
+        // Remotes & accessories pairing; this TV's settings app exports no accessories list, only the pairing screen.
+        View btnBluetooth = findViewById(R.id.btnBluetooth);
+        btnBluetooth.setOnClickListener(v -> open(new Intent("com.google.android.intent.action.CONNECT_INPUT")
+                .setPackage("com.android.tv.settings")));
+        btnBluetooth.setOnLongClickListener(v -> {
+            open(systemIntent(Settings.ACTION_SETTINGS));
+            return true;
+        });
         btnWifi.setOnLongClickListener(v -> {
             open(systemIntent(Settings.ACTION_WIFI_SETTINGS));
             return true;
@@ -771,6 +779,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (cfg.wifiLabelWidth > 0) btnWifi.setMaxWidth(Math.round(cfg.wifiLabelWidth * density));
             else makeIconOnly(btnWifi);
             makeIconOnly((TextView) btnSettings);
+            makeIconOnly(findViewById(R.id.btnBluetooth));
         }
         if (cfg.iconOnlyInputs) makeIconOnly((TextView) btnInputs);
         btnSettings.setOnLongClickListener(v -> {
@@ -797,6 +806,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         };
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
+        findViewById(R.id.btnBluetooth).setOnKeyListener(pillKeys);
         btnVpn.setOnKeyListener(pillKeys);
         btnSettings.setOnKeyListener(pillKeys);
         btnReorder.setOnKeyListener(pillKeys);
@@ -1853,7 +1863,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         Bitmap art = heroArtCache.get(key);
         if (art == null) {
-            art = HeroArt.from(adapter.artworkAt(position));
+            art = customHeroArt(adapter.packageAt(position));
+            if (art == null) art = HeroArt.from(adapter.artworkAt(position));
             if (art != null) heroArtCache.put(key, art);
         }
         heroArtKey = key;
@@ -1867,6 +1878,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             heroArt.setImageBitmap(next);
             heroArt.animate().alpha(heroArtAlpha).setDuration(420).start();
         }).start();
+    }
+
+    /** A theme's own backdrop for this app, wallpapers/hero_<package>.jpg; null when the theme has none. */
+    private Bitmap customHeroArt(String pkg) {
+        File dir = Config.dir(this);
+        if (pkg == null || dir == null) return null;
+        File f = new File(dir, ThemeFiles.WALLPAPERS + "/hero_" + pkg + ".jpg");
+        if (!f.isFile()) return null;
+        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+        o.inPreferredConfig = Bitmap.Config.RGB_565;   // ~1.8 MB at 720p; only the dock's few apps are cached
+        return android.graphics.BitmapFactory.decodeFile(f.getPath(), o);
     }
 
     private void fadeHeroArt(int ms) {
